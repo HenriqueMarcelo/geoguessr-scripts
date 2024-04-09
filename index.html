@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+    <script src="
+    https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js
+    "></script>
+    <script src="
+    https://cdnjs.cloudflare.com/ajax/libs/jsvectormap/1.4.3/maps/world.js
+    "></script>
+    <link href="
+    https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/css/jsvectormap.min.css
+" rel="stylesheet">
+        
+
+    <script>
+
+        const map = new jsVectorMap({
+            selector: '#world-map',
+            map: 'world',
+            markerStyle: {
+                initial: {
+                    strokeWidth: 0,
+                    fill: '#ff5566',
+                    fillOpacity: 1,
+                    r: 4,
+                },
+                hover: {},
+            },
+            showTooltip: false,
+            markers: [
+                { coords: [26.8206, 30.8025] },
+                { coords: [55.3781, 3.4360] },
+                { coords: [37.0902, -95.7129], style: { fill: 'green' } }
+            ]
+        })
+    </script>
+</head>
+<body>
+    <div id="world-map" style="width: 90vw; height: 90vh"></div>
+</body>
+</html>
