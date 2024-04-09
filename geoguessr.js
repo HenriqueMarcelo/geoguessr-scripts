@@ -1,19 +1,20 @@
 // ==UserScript==
 // @name         Ranked History
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      2.1
 // @description  This script will generate a log of all locations. where you played ranked matches. To access the map, wait for the game page to load completely and press the "H" key on your keyboard.
 // @author       HenriqueM
 // @match        https://www.geoguessr.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=geoguessr.com
 // @grant        GM_getResourceText
 // @grant        GM_addStyle
-// @require      https://code.jquery.com/jquery-3.7.1.min.js
-// @require      https://jvectormap.com/js/jquery-jvectormap-2.0.5.min.js
-// @require      https://cdn.jsdelivr.net/npm/ika.jvectormap@1.0.0/jquery-jvectormap-world-mill-en.js
-// @resource     IMPORTED_CSS https://cdnjs.cloudflare.com/ajax/libs/jvectormap/2.0.5/jquery-jvectormap.css
+// @require      https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js
+// @require      https://cdnjs.cloudflare.com/ajax/libs/jsvectormap/1.4.3/maps/world.js
+// @resource     IMPORTED_CSS https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/css/jsvectormap.min.css
 // @license MIT
 // ==/UserScript==
+
+let globalUserId
 
 function loadMap() {
     // Criação da div do modal
@@ -30,12 +31,13 @@ function loadMap() {
     modalDiv.style.margin = "1rem";
     modalDiv.style.left = "50%";
     modalDiv.style.transform = "translate(-50%, 0)";
+    modalDiv.style.width = "90vw";
 
     // Criação da div do mapa dentro do modal
     var mapDiv = document.createElement("div");
     mapDiv.id = "world-map";
-    mapDiv.style.width = "1000px";
-    mapDiv.style.height = "600px";
+    mapDiv.style.width = "90vw";
+    mapDiv.style.height = "90vh";
 
     // Adicionando a div do mapa dentro da div do modal
     modalDiv.appendChild(mapDiv);
@@ -43,25 +45,22 @@ function loadMap() {
     // Adicionando a div do modal ao final do body do documento
     document.body.appendChild(modalDiv);
 
-    $(function(){
-        $('#world-map').vectorMap({
-            map: 'world_mill_en',
-            scaleColors: ['#C8EEFF', '#0071A4'],
-            normalizeFunction: 'polynomial',
-            hoverOpacity: 0.7,
-            hoverColor: false,
+        const map = new jsVectorMap({
+            selector: '#world-map',
+            map: 'world',
             markerStyle: {
                 initial: {
+                    strokeWidth: 0,
+                    fill: '#ff5566',
+                    fillOpacity: 1,
                     r: 4,
-                    fill: '#F8E23B',
-                    stroke: '#383f47'
-                }
+                },
+                hover: {},
             },
-            backgroundColor: '#383f47',
+            showTooltip: false,
             markers: getAllCompetitiveLocations()
-        
-        });
-    })
+        })
+  
 
 }
 
@@ -107,8 +106,11 @@ function getAllCompetitiveLocations() {
                 return []
             } else {
                 const arrayDeArrays = storageData.map(game => game.rounds)
-                // Todo corrgiir o index abaixo
-                const arrayDeArrays2 = storageData.map(game => game.teams[0].roundResults)
+                const arrayDeArrays2 = storageData.map(game => {
+
+                    const index = game.teams.findIndex(team => team.players[0].playerId === globalUserId);
+                    return game.teams[index].roundResults;
+                })
 
                 const arrayAchatado = arrayDeArrays.reduce(function(acumulador, valorAtual) {
                     // Concatenar cada array no acumulador
@@ -122,13 +124,8 @@ function getAllCompetitiveLocations() {
 
                 const formatado = arrayAchatado.map((l, i) => {
                     return {
-                        latLng: [l.panorama.lat, l.panorama.lng], 
-                        name: '',
-                        color: '#5000ff',
-                        style: {
-                            fill: calcularCor(arrayAchatado2[i].score),
-                            stroke: calcularCor(arrayAchatado2[i].score),
-                        }
+                        coords: [l.panorama.lat, l.panorama.lng],
+                        style: { fill: calcularCor(arrayAchatado2[i].score) }
                     }
                 })
 
@@ -175,7 +172,6 @@ function calcularCor(valor) {
     async function getLocationObjectGame() {
         const tag = window.location.href.substring(window.location.href.lastIndexOf('/') + 1)
         const gameMode = getGameMode()
-        console.log(getGameMode(), 'a');
         let game_endpoint = "https://www.geoguessr.com/api/v3/games/" + tag;
         if(gameMode) {
             game_endpoint = `https://game-server.geoguessr.com/api/${gameMode}/${tag}`
@@ -188,6 +184,44 @@ function calcularCor(valor) {
         });
         return await res.json();
     }
+
+    async function getUserId() {
+        const api_url = 'https://geoguessr.com/api/v3/profiles'
+
+        const res = await fetch(api_url, {
+            method: 'GET',
+            credentials: 'include'
+        });
+        return await res.json();
+    }
+
+    async function getUserIdFromLocalStorage() {
+        // Verifica se há um valor na chave "user_id" na LocalStorage
+        const userId = localStorage.getItem("user_id");
+    
+        if (userId) {
+            // Se o valor existir, retorna o valor encontrado
+            return userId;
+        } else {
+            // Se o valor não existir, chama a função getUserId()
+            const userIdObject = await getUserId();
+    
+            // Obtém o ID do objeto retornado pela função getUserId()
+            const newUserId = userIdObject.user.id;
+    
+            // Salva o novo ID na LocalStorage
+            localStorage.setItem("user_id", newUserId);
+    
+            // Retorna o novo ID
+            return newUserId;
+        }
+    }
+
+    getUserIdFromLocalStorage().then(userId => {
+        globalUserId = userId
+    }).catch(error => {
+        console.error("Erro ao obter o User ID:", error);
+    });
 
     async function saveGameLocations() {
         const chave = getGameMode() ? 'competitiveLocations' : 'gameLocations'
@@ -264,7 +298,6 @@ function calcularCor(valor) {
             loadMap()
         }
         if (event.key === "ç") {
-            alert('salvo');
             saveGameLocations();
         }
     });
