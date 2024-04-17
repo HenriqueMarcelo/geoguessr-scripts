@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ranked History
 // @namespace    http://tampermonkey.net/
-// @version      2.1
+// @version      3.0
 // @description  This script will generate a log of all locations. where you played ranked matches. To access the map, wait for the game page to load completely and press the "H" key on your keyboard.
 // @author       HenriqueM
 // @match        https://www.geoguessr.com/*
@@ -16,6 +16,30 @@
 
 let globalUserId
 
+function showRanked() {
+    // Seleciona a div com id "world-map-normal"
+    var normalMap = document.getElementById('world-map-normal');
+    // Seleciona a div com id "world-map-ranked"
+    var rankedMap = document.getElementById('world-map-ranked');
+    
+    // Adiciona "display: none" à div "world-map-normal"
+    normalMap.style.display = 'none';
+    // Adiciona "display: block" à div "world-map-ranked"
+    rankedMap.style.display = 'block';
+}
+
+function showNormal() {
+    // Seleciona a div com id "world-map-normal"
+    var normalMap = document.getElementById('world-map-normal');
+    // Seleciona a div com id "world-map-ranked"
+    var rankedMap = document.getElementById('world-map-ranked');
+    
+    // Adiciona "display: block" à div "world-map-normal"
+    normalMap.style.display = 'block';
+    // Adiciona "display: none" à div "world-map-ranked"
+    rankedMap.style.display = 'none';
+}
+
 function loadMap() {
     // Criação da div do modal
     var modalDiv = document.createElement("div");
@@ -27,39 +51,69 @@ function loadMap() {
     modalDiv.style.zIndex = "100";
     modalDiv.style.background = "white";
     modalDiv.style.justifyContent = "center";
-    modalDiv.style.padding = "1rem";
+    // modalDiv.style.padding = "1rem";
     modalDiv.style.margin = "1rem";
     modalDiv.style.left = "50%";
     modalDiv.style.transform = "translate(-50%, 0)";
     modalDiv.style.width = "90vw";
-
-    // Criação da div do mapa dentro do modal
-    var mapDiv = document.createElement("div");
-    mapDiv.id = "world-map";
-    mapDiv.style.width = "90vw";
-    mapDiv.style.height = "90vh";
-
-    // Adicionando a div do mapa dentro da div do modal
-    modalDiv.appendChild(mapDiv);
+    modalDiv.style.height = "90vh";
 
     // Adicionando a div do modal ao final do body do documento
     document.body.appendChild(modalDiv);
 
-        const map = new jsVectorMap({
-            selector: '#world-map',
-            map: 'world',
-            markerStyle: {
-                initial: {
-                    strokeWidth: 0,
-                    fill: '#ff5566',
-                    fillOpacity: 1,
-                    r: 4,
-                },
-                hover: {},
+    document.getElementById('map-modal').innerHTML = `
+        <div id="map-holder">
+            <header style="background: lightgray; display: flex; gap: 1rem; padding: 1rem;">
+                <button class="button-59" id="btn-ranked">Ranked</button>
+                <button class="button-59" id="btn-normal">Normal</button>
+            </header>
+            
+            <div id="world-map-ranked" style="width: 90vw; height: calc(90vh - 80px); display: block;"></div>
+            <div id="world-map-normal" style="width: 90vw; height: calc(90vh - 80px); display: block;"></div>
+        </div>
+    `;
+
+    var btnRanked = document.getElementById('btn-ranked');
+    btnRanked.addEventListener('click', function() {
+        showRanked();
+    });
+
+    var btnNormal = document.getElementById('btn-normal');
+    btnNormal.addEventListener('click', function() {
+        showNormal();
+    });
+
+    const map = new jsVectorMap({
+        selector: '#world-map-normal',
+        map: 'world',
+        markerStyle: {
+            initial: {
+                strokeWidth: 0,
+                fill: '#ff5566',
+                fillOpacity: 1,
+                r: 4,
             },
-            showTooltip: false,
-            markers: getAllCompetitiveLocations()
-        })
+            hover: {},
+        },
+        showTooltip: false,
+        markers: getAllGameLocations()
+    })
+
+    const mapRanked = new jsVectorMap({
+        selector: '#world-map-ranked',
+        map: 'world',
+        markerStyle: {
+            initial: {
+                strokeWidth: 0,
+                fill: '#ff5566',
+                fillOpacity: 1,
+                r: 4,
+            },
+            hover: {},
+        },
+        showTooltip: false,
+        markers: getAllCompetitiveLocations()
+    })
   
 
 }
@@ -75,16 +129,22 @@ function getAllGameLocations() {
                 return []
             } else {
                 const arrayDeArrays = storageData.map(game => game.rounds)
+                const arrayDeArrays2 = storageData.map(game => game.player.guesses)
 
                 const arrayAchatado = arrayDeArrays.reduce(function(acumulador, valorAtual) {
                     // Concatenar cada array no acumulador
                     return acumulador.concat(valorAtual);
                 }, []);
 
-                const formatado = arrayAchatado.map(l => {
+                const arrayAchatado2 = arrayDeArrays2.reduce(function(acumulador, valorAtual) {
+                    // Concatenar cada array no acumulador
+                    return acumulador.concat(valorAtual);
+                }, []);
+
+                const formatado = arrayAchatado.map((l, i) => {
                     return {
-                        latLng: [l.lat, l.lng], 
-                        name: ''
+                        coords: [l.lat, l.lng],
+                        style: { fill: calcularCor(arrayAchatado2[i].roundScore.amount) }
                     }
                 })
 
@@ -148,6 +208,9 @@ function getGameMode() {
 }
 
 function calcularCor(valor) {
+    if(valor == 5000) {
+        return 'yellow';
+    }
     // Normalizar o valor para um intervalo entre 0 e 1
     const normalizedValue = valor / 5000;
 
@@ -302,3 +365,64 @@ function calcularCor(valor) {
         }
     });
 })();
+
+// Crie uma nova tag <style>
+var styleTag = document.createElement('style');
+
+// Defina o conteúdo da tag <style> como uma string
+var cssContent = `
+    .button-59 {
+    align-items: center;
+    background-color: #fff;
+    border: 2px solid #000;
+    box-sizing: border-box;
+    color: #000;
+    cursor: pointer;
+    display: inline-flex;
+    fill: #000;
+    font-family: Inter,sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    height: 48px;
+    justify-content: center;
+    letter-spacing: -.8px;
+    line-height: 24px;
+    min-width: 140px;
+    outline: 0;
+    padding: 0 17px;
+    text-align: center;
+    text-decoration: none;
+    transition: all .3s;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    }
+
+    .button-59:focus {
+    color: #171e29;
+    }
+
+    .button-59:hover {
+    border-color: #06f;
+    color: #06f;
+    fill: #06f;
+    }
+
+    .button-59:active {
+    border-color: #06f;
+    color: #06f;
+    fill: #06f;
+    }
+
+    @media (min-width: 768px) {
+    .button-59 {
+        min-width: 170px;
+    }
+    }
+`;
+
+// Adicione o conteúdo à tag <style>
+styleTag.innerHTML = cssContent;
+
+// Adicione a tag <style> ao corpo da página
+document.body.appendChild(styleTag);
